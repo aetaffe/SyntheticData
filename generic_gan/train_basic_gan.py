@@ -1,9 +1,3 @@
-from torch.utils.data import Dataset
-import json
-import numpy as np
-import glob
-import supervision as sv
-from PIL import Image
 import torch.nn as nn
 import random
 import torch.nn.parallel
@@ -11,6 +5,10 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
 import matplotlib.pyplot as plt
+from generator import Generator
+from discriminator import Discriminator
+from endoscopic_dataset import EndoscopicSurgicalDataset
+
 
 # Set random seed for reproducibility
 manualSeed = 999
@@ -20,29 +18,29 @@ torch.manual_seed(manualSeed)
 torch.use_deterministic_algorithms(True) # Needed for reproducible results
 
 # Root directory for dataset
-dataroot = "data"
+dataroot = "data/segmentation_data"
 
 # Number of workers for dataloader
 workers = 2
 
 # Batch size during training
-batch_size = 4
+batch_size = 64
 
 # Spatial size of training images. All images will be resized to this
 #   size using a transformer.
-image_size = 512
+image_size = 256
 
 # Number of channels in the training images. For color images this is 3
-nc = 8
+nc = 4
 
 # Size of z latent vector (i.e. size of generator input)
 nz = 100
 
 # Size of feature maps in generator
-ngf = 64
+ngf = 256
 
 # Size of feature maps in discriminator
-ndf = 64
+ndf = 256
 
 # Number of training epochs
 num_epochs = 5
@@ -70,112 +68,9 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 
-def _get_masks(polygons, width, height):
-    masks = []
-    for idx, shape in enumerate(polygons):
-        points = shape['points']
-        instr_mask = sv.polygon_to_mask(np.array(points), (width, height))
-        masks.append(instr_mask)
-
-    while len(masks) < 6:
-        masks.append(np.zeros((height, width)))
-    return masks
-
-
-class EndoscopicSurgicalDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = root_dir
-        self.transform = transform
-        self.files = [f for f in glob.glob(root_dir + "/*.json")]
-
-    def __len__(self):
-        return len(self.files)
-
-    def __getitem__(self, idx):
-        file = self.files[idx]
-        masks = None
-        with open(file) as f:
-            data = json.load(f)
-            masks = _get_masks(data['shapes'], data['imageWidth'], data['imageHeight'])
-            masks = np.stack(masks, axis=-1)
-            masks = masks.astype(np.uint8)
-
-        image_filename = file.replace('.json', '.jpg')
-        image = Image.open(image_filename)
-        image = image.convert('RGB')
-        assert len(image.getbands()) == 3, 'Image must have 3 channels'
-        image = np.array(image)
-        image = image.astype(np.uint8)
-        image = np.stack((image, masks), axis=-1)
-        if self.transform:
-            image = self.transform(image)
-        return image
-
-
-# Generator Code
-class Generator(nn.Module):
-    def __init__(self, ngpu):
-        super(Generator, self).__init__()
-        self.ngpu = ngpu
-        self.main = nn.Sequential(
-            # input is Z, going into a convolution
-            nn.ConvTranspose2d( nz, ngf * 8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
-            # state size. ``(ngf*8) x 4 x 4``
-            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True),
-            # state size. ``(ngf*4) x 8 x 8``
-            nn.ConvTranspose2d( ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
-            # state size. ``(ngf*2) x 16 x 16``
-            nn.ConvTranspose2d( ngf * 2, ngf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
-            # state size. ``(ngf) x 32 x 32``
-            nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
-            nn.Tanh()
-            # state size. ``(nc) x 64 x 64``
-        )
-
-    def forward(self, input):
-        return self.main(input)
-
-
-class Discriminator(nn.Module):
-    def __init__(self, ngpu):
-        super(Discriminator, self).__init__()
-        self.ngpu = ngpu
-        self.main = nn.Sequential(
-            # input is ``(nc) x 64 x 64``
-            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. ``(ndf) x 32 x 32``
-            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 2),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. ``(ndf*2) x 16 x 16``
-            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. ``(ndf*4) x 8 x 8``
-            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. ``(ndf*8) x 4 x 4``
-            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()
-        )
-
-    def forward(self, input):
-        return self.main(input)
-
-
 if __name__ == '__main__':
     # Create the generator
-    netG = Generator(ngpu).to(device)
+    netG = Generator(ngpu, num_latent_ch=nz, num_hidden_ch=ngf, num_img_ch=nc).to(device)
 
     # Handle multi-GPU if desired
     if (device.type == 'cuda') and (ngpu > 1):
@@ -187,7 +82,7 @@ if __name__ == '__main__':
     # print(netG)
 
     # Create the Discriminator
-    netD = Discriminator(ngpu).to(device)
+    netD = Discriminator(ngpu, num_img_ch=nc, num_hidden_ch=ndf).to(device)
 
     # Handle multi-GPU if desired
     if (device.type == 'cuda') and (ngpu > 1):
@@ -216,9 +111,9 @@ if __name__ == '__main__':
 
     # Create the dataloader
     transform = transforms.Compose([
-        transforms.Resize(image_size),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Resize((image_size, image_size)),
+        transforms.Normalize(tuple(0.5 for _ in range(nc)), tuple(0.5 for _ in range(nc)))
     ])
     dataset = EndoscopicSurgicalDataset(dataroot, transform=transform)
     # Create the dataloader
@@ -245,7 +140,7 @@ if __name__ == '__main__':
             ## Train with all-real batch
             netD.zero_grad()
             # Format batch
-            real_cpu = data[0].to(device)
+            real_cpu = data.to(device)
             b_size = real_cpu.size(0)
             label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
             # Forward pass real batch through D

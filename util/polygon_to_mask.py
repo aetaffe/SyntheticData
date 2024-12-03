@@ -15,7 +15,7 @@ cyan = (255, 255, 0)
 colors = [red, green, blue, yellow, magenta, cyan]
 show = False
 files = mylist = [f for f in glob.glob("data/*.json")]
-Path("data/masks_color").mkdir(parents=True, exist_ok=True)
+Path("../data/masks_color").mkdir(parents=True, exist_ok=True)
 
 
 def get_mask(polygons, width, height):
@@ -37,5 +37,3 @@ for file in files:
         mask_filename = file.replace('.json', '_mask.png')
         print(f'Saving mask to {mask_filename}')
         cv2.imwrite(mask_filename, instrument_mask * 50)
-
-
