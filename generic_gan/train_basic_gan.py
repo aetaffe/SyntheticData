@@ -43,7 +43,7 @@ ngf = 256
 ndf = 256
 
 # Number of training epochs
-num_epochs = 5
+num_epochs = 20
 
 # Learning rate for optimizers
 lr = 0.0002
@@ -120,6 +120,7 @@ if __name__ == '__main__':
         transforms.Normalize(tuple(0.5 for _ in range(nc)), tuple(0.5 for _ in range(nc)))
     ])
     dataset = EndoscopicSurgicalDataset(dataroot, transform=transform)
+    print('Dataset size:', len(dataset))
     # Create the dataloader
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=workers)
