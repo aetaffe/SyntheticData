@@ -37,10 +37,10 @@ nc = 4
 nz = 100
 
 # Size of feature maps in generator
-ngf = 512
+ngf = 256
 
 # Size of feature maps in discriminator
-ndf = 512
+ndf = 256
 
 # Number of training epochs
 num_epochs = 5
