@@ -11,7 +11,7 @@ class Generator(nn.Module):
             nn.BatchNorm2d(num_hidden_ch * 32),
             nn.ReLU(True),
             # state size. ``(ngf*8) x 4 x 4``
-            nn.ConvTranspose2d(num_hidden_ch * 16, num_hidden_ch * 16, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(num_hidden_ch * 32, num_hidden_ch * 16, 4, 2, 1, bias=False),
             nn.BatchNorm2d(num_hidden_ch * 16),
             nn.ReLU(True),
             # state size. ``(ngf*4) x 8 x 8``
