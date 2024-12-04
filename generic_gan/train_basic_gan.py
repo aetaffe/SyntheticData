@@ -37,10 +37,10 @@ nc = 4
 nz = 100
 
 # Size of feature maps in generator
-ngf = 256
+ngf = 512
 
 # Size of feature maps in discriminator
-ndf = 256
+ndf = 512
 
 # Number of training epochs
 num_epochs = 100
@@ -189,7 +189,7 @@ if __name__ == '__main__':
             optimizerG.step()
 
             # Output training stats
-            if i % 50 == 0:
+            if i % 8 == 0:
                 print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
                       % (epoch, num_epochs, i, len(dataloader),
                          errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
@@ -199,7 +199,7 @@ if __name__ == '__main__':
             D_losses.append(errD.item())
 
             # Check how the generator is doing by saving G's output on fixed_noise
-            if (iters % 50 == 0) or ((epoch == num_epochs - 1) and (i == len(dataloader) - 1)):
+            if (iters % 8 == 0) or ((epoch == num_epochs - 1) and (i == len(dataloader) - 1)):
                 with torch.no_grad():
                     fake = netG(fixed_noise).detach().cpu()
                 img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
