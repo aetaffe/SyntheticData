@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from generator import Generator
 from discriminator import Discriminator
 from endoscopic_dataset import EndoscopicSurgicalDataset
-
+import numpy as np
 
 # Set random seed for reproducibility
 manualSeed = 999
@@ -69,6 +69,10 @@ def weights_init(m):
 
 
 if __name__ == '__main__':
+    print('Device:', device)
+    if torch.cuda.is_available():
+        print(torch.cuda.device_count())
+
     # Create the generator
     netG = Generator(ngpu, num_latent_ch=nz, num_hidden_ch=ngf, num_img_ch=nc).to(device)
 
@@ -79,7 +83,7 @@ if __name__ == '__main__':
     # Apply the ``weights_init`` function to randomly initialize all weights
     #  to ``mean=0``, ``stdev=0.02``.
     netG.apply(weights_init)
-    # print(netG)
+    print(netG)
 
     # Create the Discriminator
     netD = Discriminator(ngpu, num_img_ch=nc, num_hidden_ch=ndf).to(device)
@@ -93,7 +97,7 @@ if __name__ == '__main__':
     netD.apply(weights_init)
 
     # Print the model
-    # print(netD)
+    print(netD)
 
     criterion = nn.BCELoss()
 
@@ -133,7 +137,6 @@ if __name__ == '__main__':
     for epoch in range(num_epochs):
         # For each batch in the dataloader
         for i, data in enumerate(dataloader, 0):
-
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
             ###########################
@@ -213,7 +216,7 @@ if __name__ == '__main__':
     plt.xlabel("iterations")
     plt.ylabel("Loss")
     plt.legend()
-    plt.show()
+    # plt.show()
     plt.savefig('losses.png')
 
     # Plot the fake images from the last epoch
@@ -221,7 +224,7 @@ if __name__ == '__main__':
     plt.axis("off")
     plt.title("Fake Images")
     plt.imshow(np.transpose(img_list[-1], (1, 2, 0)))
-    plt.show()
+    # plt.show()
     plt.savefig('fake_images.png')
 
 
