@@ -18,7 +18,7 @@ torch.manual_seed(manualSeed)
 torch.use_deterministic_algorithms(True) # Needed for reproducible results
 
 # Root directory for dataset
-dataroot = "data/segmentation_data"
+dataroot = "/home/ataffe/SyntheticData/generic_gan/data/segmentation_data"
 
 # Number of workers for dataloader
 workers = 2
