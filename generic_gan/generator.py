@@ -28,13 +28,8 @@ class Generator(nn.Module):
             nn.ReLU(True),
             # state size. ``(nc) x 64 x 64``
             nn.ConvTranspose2d(num_hidden_ch, num_img_ch, 4, 2, 1, bias=False),
-            nn.Tanh()
-<<<<<<< Updated upstream
-            # state size. ``(nc) x 256 x 156``
-=======
+            nn.Tanh())
             # state size. ``(nc) x 128 x 128``
->>>>>>> Stashed changes
-        )
 
     def forward(self, input):
         return self.main(input)

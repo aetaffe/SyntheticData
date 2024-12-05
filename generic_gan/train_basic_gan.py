@@ -73,7 +73,7 @@ if __name__ == '__main__':
     disc_device = None
     if torch.cuda.is_available():
         ngpu = torch.cuda.device_count()
-        print(f'Using {ngpu} GPUs')
+        print(f'Using {ngpu} GPU(s)')
         # Decide which device we want to run on
         gen_device = torch.device("cuda:0" if ngpu > 0 else "cpu")
         disc_device = torch.device("cuda:1" if ngpu > 1 else "cuda:0")
@@ -109,10 +109,6 @@ if __name__ == '__main__':
     # print(netD)
 
     criterion = nn.BCELoss()
-
-    # Create batch of latent vectors that we will use to visualize
-    #  the progression of the generator
-    fixed_noise = torch.randn(64, nz, 1, 1, device=gen_device)
 
     # Establish convention for real and fake labels during training
     real_label = 1.
@@ -220,14 +216,19 @@ if __name__ == '__main__':
             D_losses.append(errD.item())
 
             # Check how the generator is doing by saving G's output on fixed_noise
-            if (iters % 200 == 0) or ((epoch == num_epochs - 1) and (i == len(dataloader) - 1)):
-                with torch.no_grad():
-                    fake = netG(fixed_noise).detach().cpu()
-                # img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
-                # fake_images = np.transpose(vutils.make_grid(fake[:,:3,:,:], padding=2, normalize=True), (1, 2, 0))
-                # Nomalize the image to be between 0 and 1 for saving
-                fake_images = [np.transpose((fake[i, :3, :, :] * 0.5) + 0.5, (1, 2, 0)) for i in range(fake.shape[0])]
+            # if (iters % 200 == 0) or ((epoch == num_epochs - 1) and (i == len(dataloader) - 1)):
+            #     with torch.no_grad():
+            #         fake = netG(fixed_noise).detach().cpu()
+            #     # img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
+            #     # fake_images = np.transpose(vutils.make_grid(fake[:,:3,:,:], padding=2, normalize=True), (1, 2, 0))
+            #     # Nomalize the image to be between 0 and 1 for saving
+            #     fake_images = [np.transpose((fake[i, :3, :, :] * 0.5) + 0.5, (1, 2, 0)) for i in range(fake.shape[0])]
             iters += 1
+
+    # Save some fake images
+    with torch.no_grad():
+        fake = netG(torch.randn(64, nz, 1, 1, device=gen_device)).detach().cpu()
+        fake_images = [np.transpose((fake[i, :3, :, :] * 0.5) + 0.5, (1, 2, 0)) for i in range(fake.shape[0])]
 
     end = time.time()
     time_taken = end - start
@@ -250,7 +251,7 @@ if __name__ == '__main__':
     plt.ylabel("Loss")
     plt.legend()
     # plt.show()
-    plt.savefig('losses.png')
+    plt.savefig(f'losses_{num_epochs}_epochs.png')
 
     # Save the fake images
     # cv2.imwrite('fake_images_' + str(num_epochs) + '.jpg', cv2.cvtColor(fake_images.numpy() * 255, cv2.COLOR_RGB2BGR))

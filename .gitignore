@@ -165,3 +165,4 @@ data
 slides
 papers
 *.pth
+fake_images
