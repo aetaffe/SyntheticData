@@ -25,13 +25,19 @@ class Discriminator(nn.Module):
             nn.Conv2d(num_hidden_ch * 8, num_hidden_ch * 16, 4, 2, 1, bias=False),
             nn.BatchNorm2d(num_hidden_ch * 16),
             nn.LeakyReLU(0.2, inplace=True),
+<<<<<<< Updated upstream
             # state size. ``(ndf*16) x 8 x 8```
             nn.Conv2d(num_hidden_ch * 16, num_hidden_ch * 32, 4, 2, 1, bias=False),
             nn.BatchNorm2d(num_hidden_ch * 32),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. ``(ndf*32) x 4 x 4``
             nn.Conv2d(num_hidden_ch * 32, 1, 4, 1, 0, bias=False),
+=======
+            # state size. ``(ndf*32) x 8 x 8``
+            nn.Conv2d(num_hidden_ch * 16, 1, 4, 1, 0, bias=False),
+>>>>>>> Stashed changes
             nn.Sigmoid()
+            # state size. 1 x 1 x 1
         )
 
     def forward(self, input):
