@@ -123,6 +123,10 @@ def check_for_divergence(d_losses, g_losses, num_values=10):
     return False
 
 if __name__ == '__main__':
+    hpc = False
+    if hpc:
+        notify_by_email('GAN training has started on HPC')
+    
     # Create the device
     device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
 
