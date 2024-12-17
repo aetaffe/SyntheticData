@@ -165,4 +165,5 @@ data
 slides
 papers
 *.pth
-fake_images
+dc_gan/fake_images
+dc_gan/passwords.py
