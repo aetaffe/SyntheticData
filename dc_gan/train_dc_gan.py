@@ -58,7 +58,7 @@ num_epochs = 100
 
 # Learning rate for optimizers
 lr_dis = 0.00001
-lr_gen = 0.00009
+lr_gen = 0.000099
 # Beta1 hyperparameter for Adam optimizers
 beta1 = 0.5
 
@@ -112,47 +112,37 @@ def save_snapshot_images(generator, epoch):
         cv2.imwrite(f'fake_images/{num_epochs}_epochs/fake_image_{idx}.jpg', cv2.cvtColor(img.numpy() * 255, cv2.COLOR_RGB2BGR))
         cv2.imwrite(f'fake_images/{num_epochs}_epochs/mask_{idx}.jpg', masks[idx].numpy() * 255)
 
-def check_for_divergence(d_losses, g_losses, num_values=5):
+def check_for_divergence(d_losses, g_losses, num_values=10):
     if len(d_losses[-num_values:]) < num_values or len(g_losses[-num_values:]) < num_values:
         return False
     d_losses = d_losses[-num_values:]
     g_losses = g_losses[-num_values:]
-    threshold = 1e-3
-    if all(loss < threshold for loss in d_losses) or all(loss < threshold for loss in g_losses):
+    threshold = 1e-6
+    if all(loss <= threshold for loss in d_losses) or all(loss <= threshold for loss in g_losses):
         return True
     return False
 
 if __name__ == '__main__':
-    gen_device = None
-    disc_device = None
-    if torch.cuda.is_available():
-        ngpu = torch.cuda.device_count()
-        print(f'Using {ngpu} GPU(s)')
-        # Decide which device we want to run on
-        gen_device = torch.device("cuda:0" if ngpu > 0 else "cpu")
-        disc_device = torch.device("cuda:1" if ngpu > 1 else "cuda:0")
-    else:
-        gen_device = torch.device("cpu")
-        disc_device = torch.device("cpu")
-        print('Using CPU')
+    # Create the device
+    device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
 
     # Create the generator
-    netG = Generator(ngpu, num_latent_ch=nz, num_hidden_ch=ngf, num_img_ch=nc).to(gen_device)
+    netG = Generator(ngpu, num_latent_ch=nz, num_hidden_ch=ngf, num_img_ch=nc).to(device)
 
     # Handle multi-GPU if desired
-    # if (device.type == 'cuda') and (ngpu > 1):
-    #     netG = nn.DataParallel(netG, list(range(ngpu)))
+    if (device.type == 'cuda') and (ngpu > 1):
+        netG = nn.DataParallel(netG, list(range(ngpu)))
 
     # Apply the ``weights_init`` function to randomly initialize all weights
     #  to ``mean=0``, ``stdev=0.02``.
     netG.apply(weights_init)
 
     # Create the Discriminator
-    netD = Discriminator(ngpu, num_img_ch=nc, num_hidden_ch=ndf).to(disc_device)
+    netD = Discriminator(ngpu, num_img_ch=nc, num_hidden_ch=ndf).to(device)
 
     # Handle multi-GPU if desired
-    # if (device.type == 'cuda') and (ngpu > 1):
-    #     netD = nn.DataParallel(netD, list(range(ngpu)))
+    if (device.type == 'cuda') and (ngpu > 1):
+        netD = nn.DataParallel(netD, list(range(ngpu)))
 
     # Apply the ``weights_init`` function to randomly initialize all weights
     # like this: ``to mean=0, stdev=0.2``.
@@ -178,14 +168,6 @@ if __name__ == '__main__':
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=workers)
 
-    real_batch = next(iter(dataloader))
-    plt.figure(figsize=(8, 8))
-    plt.axis("off")
-    plt.title("Training Images")
-    plt.imshow(
-        np.transpose(vutils.make_grid(real_batch[:,:3,:,:].to(gen_device)[:4], padding=2, normalize=True).cpu(), (1, 2, 0)))
-    plt.savefig('training_images.png')
-
     # Training Loop
     # Lists to keep track of progress
     G_losses = []
@@ -207,9 +189,9 @@ if __name__ == '__main__':
                 ## Train with all-real batch
                 netD.zero_grad()
                 # Format batch
-                real_cpu = data.to(disc_device)
+                real_cpu = data.to(device)
                 b_size = real_cpu.size(0)
-                label = torch.full((b_size,), real_label, dtype=torch.float, device=disc_device)
+                label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
                 # Forward pass real batch through D
                 output = netD(real_cpu).view(-1)
                 # Calculate loss on all-real batch
@@ -220,7 +202,7 @@ if __name__ == '__main__':
 
                 ## Train with all-fake batch
                 # Generate batch of latent vectors
-                noise = torch.randn(b_size, nz, 1, 1, device=gen_device)
+                noise = torch.randn(b_size, nz, 1, 1, device=device)
                 # Generate fake image batch with G
                 fake = netG(noise)
 
@@ -228,7 +210,7 @@ if __name__ == '__main__':
                 # Classify all fake batch with D
                 output = netD(fake.detach()).view(-1)
                 # Calculate D's loss on the all-fake batch
-                label.to(gen_device)
+                label.to(device)
                 errD_fake = criterion(output, label)
                 # Calculate the gradients for this batch, accumulated (summed) with previous gradients
                 errD_fake.backward()
@@ -241,12 +223,8 @@ if __name__ == '__main__':
                 ############################
                 # (2) Update G network: maximize log(D(G(z)))
                 ###########################
-                noise = torch.randn(b_size, nz, 1, 1, device=gen_device)
-                # Generate fake image batch with G
-                fake = netG(noise)
                 netG.zero_grad()
                 label.fill_(real_label)  # fake labels are real for generator cost
-                label.to(disc_device)
                 # Since we just updated D, perform another forward pass of all-fake batch through D
                 output = netD(fake).view(-1)
                 # Calculate G's loss based on this output
@@ -269,7 +247,7 @@ if __name__ == '__main__':
 
                 if check_for_divergence(D_losses, G_losses):
                     print(f'G losses: {G_losses[-3:]} | D losses: {D_losses[-3:]}')
-                    notify_by_email('GAN training has collapsed at epoch ' + str(epoch))
+                    notify_by_email(f'GAN training has diverged at epoch {epoch}. G losses: {G_losses[-10:]} | D losses: {D_losses[-10:]}')
                     sys.exit(1)
 
                 # Save Losses for plotting later
