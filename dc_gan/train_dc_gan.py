@@ -34,7 +34,7 @@ dataroot = "../data/segmentation_data"
 workers = 2
 
 # Batch size during training
-batch_size = 2
+batch_size = 4
 
 # Spatial size of training images. All images will be resized to this
 #   size using a transformer.
@@ -53,7 +53,7 @@ ngf = 128
 ndf = 128
 
 # Number of training epochs
-num_epochs = 1000
+num_epochs = 100
 
 
 # Learning rate for optimizers
@@ -112,18 +112,15 @@ def save_snapshot_images(generator, epoch):
         cv2.imwrite(f'fake_images/{num_epochs}_epochs/fake_image_{idx}.jpg', cv2.cvtColor(img.numpy() * 255, cv2.COLOR_RGB2BGR))
         cv2.imwrite(f'fake_images/{num_epochs}_epochs/mask_{idx}.jpg', masks[idx].numpy() * 255)
 
-def check_for_divergence(d_losses, g_losses):
-    if len(d_losses) == 0 or len(g_losses) == 0:
+def check_for_divergence(d_losses, g_losses, num_values=5):
+    if len(d_losses[-num_values:]) < num_values or len(g_losses[-num_values:]) < num_values:
         return False
+    d_losses = d_losses[-num_values:]
+    g_losses = g_losses[-num_values:]
     threshold = 1e-3
-    for loss in d_losses:
-        if loss > threshold:
-            return False
-
-    for loss in g_losses:
-        if loss > threshold:
-            return False
-    return True
+    if all(loss < threshold for loss in d_losses) or all(loss < threshold for loss in g_losses):
+        return True
+    return False
 
 if __name__ == '__main__':
     gen_device = None
@@ -190,13 +187,9 @@ if __name__ == '__main__':
     plt.savefig('training_images.png')
 
     # Training Loop
-
     # Lists to keep track of progress
-    # img_list = []
-    fake_images = []
     G_losses = []
     D_losses = []
-    iters = 0
 
     start = time.time()
     print("Starting Training Loop...")
@@ -206,26 +199,24 @@ if __name__ == '__main__':
             # For each batch in the dataloader
             avg_loss_D = 0
             avg_loss_G = 0
+            num_iteration_increases = 0
             for i, data in enumerate(dataloader, 0):
                 ############################
                 # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
                 ###########################
-                num_iterations_d = 10 if i > 25 and (avg_loss_D - avg_loss_G) > 5 else 1
-
-                for _ in range(num_iterations_d):
-                    ## Train with all-real batch
-                    netD.zero_grad()
-                    # Format batch
-                    real_cpu = data.to(disc_device)
-                    b_size = real_cpu.size(0)
-                    label = torch.full((b_size,), real_label, dtype=torch.float, device=disc_device)
-                    # Forward pass real batch through D
-                    output = netD(real_cpu).view(-1)
-                    # Calculate loss on all-real batch
-                    errD_real = criterion(output, label)
-                    # Calculate gradients for D in backward pass
-                    errD_real.backward()
-                    D_x = output.mean().item()
+                ## Train with all-real batch
+                netD.zero_grad()
+                # Format batch
+                real_cpu = data.to(disc_device)
+                b_size = real_cpu.size(0)
+                label = torch.full((b_size,), real_label, dtype=torch.float, device=disc_device)
+                # Forward pass real batch through D
+                output = netD(real_cpu).view(-1)
+                # Calculate loss on all-real batch
+                errD_real = criterion(output, label)
+                # Calculate gradients for D in backward pass
+                errD_real.backward()
+                D_x = output.mean().item()
 
                 ## Train with all-fake batch
                 # Generate batch of latent vectors
@@ -250,23 +241,20 @@ if __name__ == '__main__':
                 ############################
                 # (2) Update G network: maximize log(D(G(z)))
                 ###########################
-                num_iterations_g = 10 if i > 25 and (avg_loss_G - avg_loss_D) > 5 else 1
-
-                for _ in range(num_iterations_g):
-                    noise = torch.randn(b_size, nz, 1, 1, device=gen_device)
-                    # Generate fake image batch with G
-                    fake = netG(noise)
-                    netG.zero_grad()
-                    label.fill_(real_label)  # fake labels are real for generator cost
-                    label.to(disc_device)
-                    # Since we just updated D, perform another forward pass of all-fake batch through D
-                    output = netD(fake).view(-1)
-                    # Calculate G's loss based on this output
-                    errG = criterion(output, label)
-                    # Calculate gradients for G
-                    errG.backward()
-                    D_G_z2 = output.mean().item()
-                    # Update G
+                noise = torch.randn(b_size, nz, 1, 1, device=gen_device)
+                # Generate fake image batch with G
+                fake = netG(noise)
+                netG.zero_grad()
+                label.fill_(real_label)  # fake labels are real for generator cost
+                label.to(disc_device)
+                # Since we just updated D, perform another forward pass of all-fake batch through D
+                output = netD(fake).view(-1)
+                # Calculate G's loss based on this output
+                errG = criterion(output, label)
+                # Calculate gradients for G
+                errG.backward()
+                D_G_z2 = output.mean().item()
+                # Update G
                 optimizerG.step()
                 avg_loss_D += errD.item()
                 avg_loss_G += errG.item()
@@ -279,7 +267,7 @@ if __name__ == '__main__':
                              errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
                     print(bcolors.OKCYAN +  f'Average Epoch Loss D: {avg_loss_D / (i + 1)} | Average Epoch Loss G: {avg_loss_G / (i + 1)}')
 
-                if check_for_divergence(D_losses[-5:], G_losses[-5:]):
+                if check_for_divergence(D_losses, G_losses):
                     print(f'G losses: {G_losses[-3:]} | D losses: {D_losses[-3:]}')
                     notify_by_email('GAN training has collapsed at epoch ' + str(epoch))
                     sys.exit(1)
@@ -293,6 +281,7 @@ if __name__ == '__main__':
 
     # Save some fake images
     save_snapshot_images(netG, num_epochs)
+    notify_by_email('GAN training has completed')
 
     end = time.time()
     time_taken = end - start
