@@ -167,3 +167,4 @@ papers
 *.pth
 dc_gan/fake_images
 dc_gan/passwords.py
+fake_images
