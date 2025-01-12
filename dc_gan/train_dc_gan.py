@@ -34,7 +34,7 @@ dataroot = "../data/segmentation_data"
 workers = 2
 
 # Batch size during training
-batch_size = 4
+batch_size = 2
 
 # Spatial size of training images. All images will be resized to this
 #   size using a transformer.
@@ -53,12 +53,11 @@ ngf = 128
 ndf = 128
 
 # Number of training epochs
-num_epochs = 100
-
+num_epochs = 2000
 
 # Learning rate for optimizers
-lr_dis = 0.00001
-lr_gen = 0.000099
+lr_dis = 0.000009
+lr_gen = 0.0001
 # Beta1 hyperparameter for Adam optimizers
 beta1 = 0.5
 
@@ -101,16 +100,17 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 def save_snapshot_images(generator, epoch):
-    Path('snapshots').mkdir(parents=True, exist_ok=True)
-    Path(f'snapshots/{num_epochs}_epochs').mkdir(parents=True, exist_ok=True)
+    fake_images = []
+    masks = []
     with torch.no_grad():
-        fake = netG(torch.randn(64, nz, 1, 1, device=gen_device)).detach().cpu()
+        fake = netG(torch.randn(64, nz, 1, 1, device=device)).detach().cpu()
         fake_images = [np.transpose((fake[idx, :3, :, :] * 0.5) + 0.5, (1, 2, 0)) for idx in range(fake.shape[0])]
         masks = [(fake[idx, 3, :, :] * 0.5) + 0.5 for idx in range(fake.shape[0])]
 
+    Path(f'snapshots/{epoch}_epochs').mkdir(parents=True, exist_ok=True)
     for idx, img in enumerate(fake_images):
-        cv2.imwrite(f'fake_images/{num_epochs}_epochs/fake_image_{idx}.jpg', cv2.cvtColor(img.numpy() * 255, cv2.COLOR_RGB2BGR))
-        cv2.imwrite(f'fake_images/{num_epochs}_epochs/mask_{idx}.jpg', masks[idx].numpy() * 255)
+        cv2.imwrite(f'snapshots/{epoch}_epochs/fake_image_{idx}.jpg', cv2.cvtColor(img.numpy() * 255, cv2.COLOR_RGB2BGR))
+        cv2.imwrite(f'snapshots/{epoch}_epochs/mask_{idx}.jpg', masks[idx].numpy() * 255)
 
 def check_for_divergence(d_losses, g_losses, num_values=10):
     if len(d_losses[-num_values:]) < num_values or len(g_losses[-num_values:]) < num_values:
@@ -126,7 +126,7 @@ if __name__ == '__main__':
     hpc = False
     if hpc:
         notify_by_email('GAN training has started on HPC')
-    
+
     # Create the device
     device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
 
