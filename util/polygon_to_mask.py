@@ -30,10 +30,15 @@ def get_mask(polygons, width, height):
     return mask
 
 
-for file in files:
-    with open(file) as f:
-        data = json.load(f)
-        instrument_mask = get_mask(data['shapes'], data['imageWidth'], data['imageHeight']).astype(np.uint8)
-        mask_filename = file.replace('.json', '_mask.png')
-        print(f'Saving mask to {mask_filename}')
-        cv2.imwrite(mask_filename, instrument_mask * 50)
+def make_masks():
+    for file in files:
+        with open(file) as f:
+            data = json.load(f)
+            instrument_mask = get_mask(data['shapes'], data['imageWidth'], data['imageHeight']).astype(np.uint8)
+            mask_filename = file.replace('.json', '_mask.png')
+            print(f'Saving mask to {mask_filename}')
+            cv2.imwrite(mask_filename, instrument_mask * 50)
+
+
+if __name__ == '__main__':
+    make_masks()

@@ -168,3 +168,4 @@ papers
 dc_gan/fake_images
 dc_gan/passwords.py
 dc_gan/snapshots
+fake_images
