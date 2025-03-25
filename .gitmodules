@@ -2,3 +2,6 @@
 	path = stylegan3
 	url = git@github.com:aetaffe/stylegan3.git
 	branch = main
+[submodule "unet-stylegan2"]
+	path = unet-stylegan2
+	url = git@github.com:aetaffe/unet-stylegan2.git
