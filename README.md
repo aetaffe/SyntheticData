@@ -6,9 +6,7 @@ The following model were or will be tested:
 
 #### GANs
 1. DCGAN
-2. Stylegan
+2. Stylegan2-ada
 
 #### Diffusion
-1. Latent Diffusion (DDPM/DDIM)
-2. DDPM
-3. DDIM
+1. Latent Diffusion
