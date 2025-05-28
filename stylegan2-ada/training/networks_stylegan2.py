@@ -10,8 +10,6 @@
 "Analyzing and Improving the Image Quality of StyleGAN".
 Matches the original implementation of configs E-F by Karras et al. at
 https://github.com/NVlabs/stylegan2/blob/master/training/networks_stylegan2.py"""
-from platform import architecture
-from symbol import encoding_decl
 
 import numpy as np
 import torch

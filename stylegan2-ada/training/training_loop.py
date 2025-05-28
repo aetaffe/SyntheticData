@@ -79,14 +79,11 @@ def save_image_grid(img, fname, drange, grid_size):
     img = img.transpose(0, 3, 1, 4, 2)
     img = img.reshape([gh * H, gw * W, C])
 
-    assert C in [1, 4]
+    assert C in [1, 3]
     if C == 1:
         PIL.Image.fromarray(img[:, :, 0], 'L').save(fname)
     if C == 3:
         PIL.Image.fromarray(img, 'RGB').save(fname)
-    if C == 4:
-        PIL.Image.fromarray(img[:, :, :3], 'RGB').save(os.path.splitext(fname)[0] + '.jpg')
-        PIL.Image.fromarray(img[:, :,3], 'L').save(os.path.splitext(fname)[0] + '_mask.jpg')
 
 #----------------------------------------------------------------------------
 
@@ -372,7 +369,7 @@ def training_loop(
         # Save network snapshot.
         snapshot_pkl = None
         snapshot_data = None
-        if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0) and cur_tick > 0:
+        if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0):
             snapshot_data = dict(G=G, D=D, G_ema=G_ema,D_ema=D_ema, augment_pipe=augment_pipe, training_set_kwargs=dict(training_set_kwargs))
             for key, value in snapshot_data.items():
                 if isinstance(value, torch.nn.Module):

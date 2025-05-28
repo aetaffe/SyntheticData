@@ -15,8 +15,6 @@ import PIL.Image
 import json
 import torch
 import dnnlib
-import supervision as sv
-import copy
 
 try:
     import pyspng
