@@ -5,8 +5,8 @@ surgical videos by generating synthetic data. I am generating the data using GAN
 The following model were or will be tested:
 
 #### GANs
-1. DCGAN
-2. Stylegan2-ada
+1. Stylegan2-ada/Stylegan3
+2. DatasetGAN
 
 #### Diffusion
 1. Latent Diffusion
