@@ -66,8 +66,7 @@ def setup_snapshot_image_grid(training_set, random_seed=0):
     return (gw, gh), np.stack(images), np.stack(labels)
 
 #----------------------------------------------------------------------------
-
-def save_image_grid(img, fname, drange, grid_size):
+def get_image_grid(img, drange, grid_size):
     lo, hi = drange
     img = np.asarray(img, dtype=np.float32)
     img = (img - lo) * (255 / (hi - lo))
@@ -78,6 +77,10 @@ def save_image_grid(img, fname, drange, grid_size):
     img = img.reshape([gh, gw, C, H, W])
     img = img.transpose(0, 3, 1, 4, 2)
     img = img.reshape([gh * H, gw * W, C])
+    return img, C
+
+def save_image_grid(img, fname, drange, grid_size):
+    img, C = get_image_grid(img, drange, grid_size)
 
     assert C in [1, 3]
     if C == 1:
@@ -217,14 +220,6 @@ def training_loop(
     grid_size = None
     grid_z = None
     grid_c = None
-    if rank == 0:
-        print('Exporting sample images...')
-        grid_size, images, labels = setup_snapshot_image_grid(training_set=training_set)
-        save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0,255], grid_size=grid_size)
-        grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
-        grid_c = torch.from_numpy(labels).to(device).split(batch_gpu)
-        images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
-        save_image_grid(images, os.path.join(run_dir, 'fakes_init.png'), drange=[-1,1], grid_size=grid_size)
 
     # Initialize logs.
     if rank == 0:
@@ -241,6 +236,17 @@ def training_loop(
         except ImportError as err:
             print('Skipping tfevents export:', err)
 
+    if rank == 0:
+        print('Exporting sample images...')
+        grid_size, images, labels = setup_snapshot_image_grid(training_set=training_set)
+        save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0,255], grid_size=grid_size)
+        stats_tfevents.add_image("Real_Images", np.transpose(get_image_grid(images, drange=[0,255], grid_size=grid_size)[0], (2,0,1)))
+        grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
+        grid_c = torch.from_numpy(labels).to(device).split(batch_gpu)
+        images = torch.cat([G_ema(z=z, c=c, noise_mode='const').cpu() for z, c in zip(grid_z, grid_c)]).numpy()
+        save_image_grid(images, os.path.join(run_dir, 'fakes_init.png'), drange=[-1,1], grid_size=grid_size)
+        stats_tfevents.add_image("Synthetic_Images", np.transpose(get_image_grid(images, drange=[-1,1], grid_size=grid_size)[0], (2, 0, 1)))
+
     # Train.
     if rank == 0:
         print(f'Training for {total_kimg} kimg...')
@@ -253,7 +259,7 @@ def training_loop(
     batch_idx = 0
     if progress_fn is not None:
         progress_fn(0, total_kimg)
-
+    last_ada_adjust = 0
     while True:
 
         # Fetch training data.
@@ -328,6 +334,7 @@ def training_loop(
         if (ada_stats is not None) and (batch_idx % ada_interval == 0):
             ada_stats.update()
             adjust = np.sign(ada_stats['Loss/signs/real'] - ada_target) * (batch_size * ada_interval) / (ada_kimg * 1000)
+            last_ada_adjust = adjust
             augment_pipe.p.copy_((augment_pipe.p + adjust).max(misc.constant(0, device=device)))
 
         # Perform maintenance tasks once per tick.
@@ -343,6 +350,8 @@ def training_loop(
         fields += [f"time {dnnlib.util.format_time(training_stats.report0('Timing/total_sec', tick_end_time - start_time)):<12s}"]
         fields += [f"sec/tick {training_stats.report0('Timing/sec_per_tick', tick_end_time - tick_start_time):<7.1f}"]
         fields += [f"sec/kimg {training_stats.report0('Timing/sec_per_kimg', (tick_end_time - tick_start_time) / (cur_nimg - tick_start_nimg) * 1e3):<7.2f}"]
+        fields += [f"ada_p {augment_pipe.p:<.2f}"]
+        fields += [f"last_ada_p_adjust {last_ada_adjust:<.2f}"]
         fields += [f"maintenance {training_stats.report0('Timing/maintenance_sec', maintenance_time):<6.1f}"]
         fields += [f"cpumem {training_stats.report0('Resources/cpu_mem_gb', psutil.Process(os.getpid()).memory_info().rss / 2**30):<6.2f}"]
         fields += [f"gpumem {training_stats.report0('Resources/peak_gpu_mem_gb', torch.cuda.max_memory_allocated(device) / 2**30):<6.2f}"]
