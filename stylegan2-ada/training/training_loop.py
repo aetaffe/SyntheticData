@@ -331,7 +331,7 @@ def training_loop(
         batch_idx += 1
 
         # Execute ADA heuristic.
-        if (ada_stats is not None) and (batch_idx % ada_interval == 0):
+        if (ada_stats is not None) and (batch_idx % ada_interval == 0) and augment_pipe.p < ada_target:
             ada_stats.update()
             adjust = np.sign(ada_stats['Loss/signs/real'] - ada_target) * (batch_size * ada_interval) / (ada_kimg * 1000)
             last_ada_adjust = adjust
